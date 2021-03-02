@@ -34,3 +34,12 @@ services:
       - ./data:/data
     ports:
       - 3000:3000
+
+  node:
+    image: node_web_ui
+    container_name: binance_trader_node
+    volumes:
+        ./data:/app/data
+    ports: 
+        8080:8080
+    command:  node server.js  
