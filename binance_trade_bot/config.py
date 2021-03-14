@@ -7,15 +7,19 @@ from .models import Coin
 CFG_FL_NAME = "user.cfg"
 USER_CFG_SECTION = "binance_user_config"
 
+default_db_address = "sqlite:///data/crypto_trading.db"
+
 
 class Config:  # pylint: disable=too-few-public-methods
     def __init__(self):
         # Init config
         config = configparser.ConfigParser()
         config["DEFAULT"] = {
+            "database_address": default_db_address,
             "bridge": "USDT",
             "scout_multiplier": "5",
             "scout_sleep_time": "5",
+            "api_server_port": "5123",
             "hourToKeepScoutHistory": "1",
             "tld": "com",
             "trade_fee": "auto",
@@ -43,6 +47,10 @@ class Config:  # pylint: disable=too-few-public-methods
         self.SCOUT_SLEEP_TIME = int(
             os.environ.get("SCOUT_SLEEP_TIME") or config.get(USER_CFG_SECTION, "scout_sleep_time")
         )
+
+        # misc
+        self.API_SERVER_PORT = config.get(USER_CFG_SECTION, "api_server_port")
+        self.DATABASE_ADDRESS = config.get(USER_CFG_SECTION, "database_address")
 
         # Get config for binance
         self.BINANCE_API_KEY = os.environ.get("API_KEY") or config.get(USER_CFG_SECTION, "api_key")

@@ -10,7 +10,7 @@ from socketio.exceptions import ConnectionError as SocketIOConnectionError
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
-from .config import Config
+from .config import Config, default_db_address
 from .logger import Logger
 from .models import *  # pylint: disable=wildcard-import
 
@@ -19,7 +19,13 @@ class Database:
     def __init__(self, logger: Logger, config: Config, uri="sqlite:///data/crypto_trading.db"):
         self.logger = logger
         self.config = config
-        self.engine = create_engine(uri)
+
+        if self.config.DATABASE_ADDRESS != default_db_address:
+            logger.debug("using customized db_address: " + self.config.DATABASE_ADDRESS)
+            self.engine = create_engine(self.config.DATABASE_ADDRESS, connect_args={"check_same_thread": False})
+        else:
+            self.engine = create_engine(uri, connect_args={"check_same_thread": False})
+
         self.SessionMaker = sessionmaker(bind=self.engine)
         self.socketio_client = Client()
 
@@ -28,7 +34,7 @@ class Database:
             return True
         try:
             if not self.socketio_client.connected:
-                self.socketio_client.connect("http://api:5123", namespaces=["/backend"])
+                self.socketio_client.connect("http://api:" + self.config.API_SERVER_PORT, namespaces=["/backend"])
             while not self.socketio_client.connected or not self.socketio_client.namespaces:
                 time.sleep(0.1)
             return True
@@ -145,13 +151,16 @@ class Database:
             session.expunge_all()
             return pairs
 
-    def log_scout(
-        self,
-        pair: Pair,
-        target_ratio: float,
-        current_coin_price: float,
-        other_coin_price: float,
-    ):
+    def log_scout_stack(self, sh_stack: List[ScoutHistory]):
+        session: Session
+        with self.db_session() as session:
+            merged_shs = []
+            for sh_temp in sh_stack:
+                merged_shs.append(session.merge(sh_temp))
+
+            self.send_bulk_update(merged_shs)
+
+    def log_scout(self, pair: Pair, target_ratio: float, current_coin_price: float, other_coin_price: float):
         session: Session
         with self.db_session() as session:
             pair = session.merge(pair)
@@ -216,6 +225,15 @@ class Database:
 
     def start_trade_log(self, from_coin: Coin, to_coin: Coin, selling: bool):
         return TradeLog(self, from_coin, to_coin, selling)
+
+    def send_bulk_update(self, models):
+        if not self.socketio_connect():
+            return
+
+        bulk_data = list(model.info() for model in models)
+        self.socketio_client.emit(
+            "update_bulk", {"table": models[0].__tablename__, "data": bulk_data}, namespace="/backend"
+        )
 
     def send_update(self, model):
         if not self.socketio_connect():
