@@ -10,7 +10,7 @@ USER_CFG_SECTION = "binance_user_config"
 default_db_address = "sqlite:///data/crypto_trading.db"
 
 
-class Config:  # pylint: disable=too-few-public-methods
+class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
     def __init__(self):
         # Init config
         config = configparser.ConfigParser()
