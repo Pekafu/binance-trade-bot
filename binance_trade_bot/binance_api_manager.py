@@ -10,7 +10,7 @@ from .config import Config
 from .database import Database
 from .logger import Logger
 from .models import Coin
-from .utils import get_market_ticker_price_from_list
+from .utils import get_market_ticker_price_from_list, un_notate_exp_float
 
 
 class BinanceAPIManager:
@@ -170,7 +170,7 @@ class BinanceAPIManager:
             try:
                 order = self.binance_client.order_limit_buy(
                     symbol=origin_symbol + target_symbol,
-                    quantity=order_quantity,
+                    quantity=un_notate_exp_float(order_quantity),
                     price=from_coin_price,
                 )
                 self.logger.info(order)
