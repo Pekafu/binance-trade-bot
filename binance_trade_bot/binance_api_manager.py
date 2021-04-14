@@ -6,6 +6,7 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from cachetools import TTLCache, cached
 
+from .binance_stream_manager import BinanceCache, BinanceStreamManager
 from .config import Config
 from .database import Database
 from .logger import Logger
@@ -31,6 +32,8 @@ class BinanceAPIManager:
         self.db = db
         self.logger = logger
         self.config = config
+        self.cache = BinanceCache()
+        self.stream_manager = BinanceStreamManager(self.cache, self.binance_client, self.logger)
 
     @cached(cache=TTLCache(maxsize=1, ttl=43200))
     def get_trade_fees(self) -> Dict[str, float]:
