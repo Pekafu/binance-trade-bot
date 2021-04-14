@@ -6,7 +6,7 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from cachetools import TTLCache, cached
 
-from .binance_stream_manager import BinanceCache, BinanceStreamManager
+from .binance_stream_manager import BinanceCache, BinanceOrder, BinanceStreamManager
 from .config import Config
 from .database import Database
 from .logger import Logger
@@ -97,9 +97,9 @@ class BinanceAPIManager:
             try:
                 return func(*args, **kwargs)
             except Exception as e:  # pylint: disable=broad-except
-                self.logger.info("Failed to Buy/Sell. Trying Again.")
+                self.logger.warning(f"Failed to Buy/Sell. Trying Again (attempt {attempts}/20)")
                 if attempts == 0:
-                    self.logger.info(e)
+                    self.logger.warning(e)
                 attempts += 1
         return None
 
@@ -124,7 +124,8 @@ class BinanceAPIManager:
     def wait_for_order(self, origin_symbol, target_symbol, order_id):
         while True:
             try:
-                order_status = self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id)
+                order_status: BinanceOrder = self.cache.orders.get(order_id, None)
+                # order_status = self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id)
                 break
             except BinanceAPIException as e:
                 self.logger.info(e)
@@ -137,7 +138,10 @@ class BinanceAPIManager:
 
         while order_status["status"] != "FILLED":
             try:
-                order_status = self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id)
+                order_status = self.cache.orders.get(order_id, None)
+                # order_status = self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id)
+                self.logger.debug(f"Waiting for order {order_id} to be filled")
+                time.sleep(1)
 
                 if self._should_cancel_order(order_status):
                     cancel_order = None
@@ -239,7 +243,7 @@ class BinanceAPIManager:
                 self.logger.info(e)
                 time.sleep(1)
             except Exception as e:  # pylint: disable=broad-except
-                self.logger.info(f"Unexpected Error: {e}")
+                self.logger.warning(f"Unexpected Error: {e}")
 
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
